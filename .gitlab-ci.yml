@@ -65,7 +65,26 @@ rust-check:
     - mkdir -p /builds/neiam/cooperative-systems-spaces/edge/../frontend_edge/dist
     - apt-get update && apt-get install -y libpq-dev cmake build-essential
   script:
-    - cargo test --all
+    # Scoped to the crates this pipeline actually ships, not `--all`.
+    #
+    # This workspace has contained bevy since c651930 ("ToolGuard Workflows
+    # and Various Kiosks"), so `cargo test --all` compiles a game engine,
+    # gltf parsers and the two toolguard UIs before it will let a web server
+    # image be built. Locally that is a 14GB target directory. On a runner it
+    # is a disk-and-time gamble gating `build-docker`, and losing the gamble
+    # means no image — which is how r.g.gmp.io/...:latest ended up months
+    # stale while master moved on past it.
+    #
+    # The Dockerfile below builds `--package css-server --package css-cli`
+    # and says so explicitly ("skip edge components in dockerfile"). css_lib
+    # is a dependency of both and compiles either way, so its tests are free.
+    # css-edge is kept because it is small, has no bevy in its tree, and is
+    # what the frontend_edge/dist mkdir above exists for — it is built by
+    # Dockerfile.edge in the GitHub pipeline.
+    #
+    # kiosk, toolguard-test-ui and toolguard-status-ui are in neither
+    # Dockerfile. Add a crate back the day an image starts shipping it.
+    - cargo test -p css-server -p css-cli -p css_lib -p css-edge
     # Uncomment when ready:
     # - cargo fmt --all -- --check
     # - cargo clippy --all-targets --all-features -- -D warnings
